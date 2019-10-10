@@ -1,5 +1,5 @@
 # Dynatrace - ApplicationCreation 
-This script will create a new Application and Application rules based on the Applicaiton rules defined on on a excel file
+This script will create a new Application and Application rules based on the Application rules defined on on a excel file
 
 ![Dynatrace Application](img/mywebapp.PNG?raw=true "Dynatrace Application")
 
