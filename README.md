@@ -1,5 +1,5 @@
 # Dynatrace - ApplicationCreation 
-This script will create a new Application and Application rules based on the Applicaiton rules defined on on a excel file
+This script will create a new Application and Application rules based on the Application rules defined on on a excel file
 
 ![Dynatrace Application](img/mywebapp.PNG?raw=true "Dynatrace Application")
 
@@ -10,21 +10,21 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-This is a python script, so you will need [python installed](https://www.python.org/downloads/) to execute the script
+* This is a python script, so you will need [python installed](https://www.python.org/downloads/) to execute the script
 
-URL from your Dynatrace environment
+* URL from your Dynatrace environment
 
-Dynatrace API Token
+* Dynatrace API Token
 
-Application definition rules - provided in this repo [app-test.xlsx](app-test.xlsx) (the excel file will contain the AppName followe for the URL rule definition to apply) 
-The applicaiton rules have to be defined in order (All definitions from an application together in teh excel file)
+* Application definition rules - provided in this repo [app-test.xlsx](app-test.xlsx) (the excel file will contain the AppName followe for the URL rule definition to apply) 
+The application rules have to be defined in order (All definitions from an application together in teh excel file)
 
-Appllicaiton definition template - Select the proper template to create an application with or without RUM enabled. Templates provided in this repo:
+* Application definition template - Select the proper template to create an application with or without RUM enabled. Templates provided in this repo:
 [applicationTemplate.json](applicationTemplate.json)
 [applicationTemplate-NO-RUM.json](applicationTemplate-NO-RUM.json)
 
 
-Application Rule templates - Select the rules to apply to the application rules together with the URLs from teh excel file. Is needed to indicate is those rules will be URL contains, begins with... There are different json tempaltes for the different rules that can be applied
+* Application Rule templates - Select the rules to apply to the application rules together with the URLs from teh excel file. Is needed to indicate is those rules will be URL contains, begins with... There are different json tempaltes for the different rules that can be applied
 [applicationRuleTemplate-BEGINS_WITH.json](applicationRuleTemplate-BEGINS_WITH.json)
 [applicationRuleTemplateCONTAINS.json](applicationRuleTemplateCONTAINS.json)
 
