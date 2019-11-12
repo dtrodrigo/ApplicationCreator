@@ -12,6 +12,8 @@ These instructions will get you a copy of the project up and running on your loc
 
 * This is a python script, so you will need [python installed](https://www.python.org/downloads/) to execute the script
 
+* Python pandas module is used to read the excel file, install Pandas module with `pip install pandas`
+
 * URL from your Dynatrace environment
 
 * Dynatrace API Token
