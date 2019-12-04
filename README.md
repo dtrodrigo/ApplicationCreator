@@ -19,7 +19,7 @@ These instructions will get you a copy of the project up and running on your loc
 * Dynatrace API Token
 
 * Application definition rules - provided in this repo [app-test.xlsx](app-test.xlsx) (the excel file will contain the AppName followe for the URL rule definition to apply) 
-The application rules have to be defined in order (All definitions from an application together in teh excel file)
+
 
 * Application definition template - Select the proper template to create an application with or without RUM enabled. Templates provided in this repo:
 [applicationTemplate.json](applicationTemplate.json)
@@ -100,20 +100,3 @@ appCreatorLog_12_46_10_10_2019.log
 
 The maximum Application rules allowed in v176 is 1000 different Application definitions.
 If the application is already defined with teh same name as provided in the excel, it will create another one with the saame name followed by (1), ie: "My repeated App (1)"
-In teh excel, the application definitions have to be together, for example
-App1 | URL1
-App1 | URL2
-App1 | URL3
-App2 | URL1
-App2 | URL2
-
-This will create  two applications : App1[URL1,URL2, URL3] and App2[URL1, URL2]
-
-If the excel has the rules not in order it will create multiple applications with same name:
-App1 | URL1
-App2 | URL1
-App1 | URL2
-App2 | URL2
-App2 | URL3
-
-This will create 4 applications : App1[URL1], App2[URL1], App1 (1)[URL2] and App2 (1)[URL2, URL3]
