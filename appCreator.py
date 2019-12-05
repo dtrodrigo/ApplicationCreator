@@ -28,6 +28,7 @@ ERROR = "ERROR"
 INFO = "INFO"
 FORMAT_ERROR_MSG = "ERROR: Wrong Environment URL format, plase change teh ENV variable to follow the format : start with https://<your-Dynatrace-environment> , wihtout / at the end"
 FORMAT_ERROR_EXAMPLE_MSG = "Example: 'https://mypilotenvironment.live.dynatrace.com' or https://myenvironment.live.dynatrace.com or https://myenvironment.dynatrace-managed.com/e/123-123123-123-123-123"
+APPLICATIONS_DEFINED_LIST = None
 PATH = os.getcwd()
 logging.basicConfig(filename=datetime.now().strftime('appCreatorLog_%H_%M_%d_%m_%Y.log'), filemode='w', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
@@ -55,17 +56,39 @@ def readAppRules():
 	     	appRules[app] = [row['Rule']]
 	return appRules
 
+# Return the application Name and ID if it is already defined on the environment
+# 
+def applicationAlreadyDefinedInEnvironment(applicationName):
+	for application in APPLICATIONS_DEFINED_LIST:
+		if application['name'] == applicationName:
+			return application
+	return None
 
 # PostNewApplication: Create a new appication with the corresponding Application rules
 #
 def createNewApplicationAndRules(applicationName, applicationRules):
-	application = createApplication(applicationName)
+	# Just create a new application if this does not already exist on the Dynatrace Environment 
+	if isApplicationAlreadyDefinedInEnvironment(applicationName):
+		application = applicationAlreadyDefinedInEnvironment(applicationName)
+		logAndOutput("Update Application: "+ application['name']+ " ID: "+ str(application['id']),INFO)
+	else:
+		application = createApplication(applicationName)
+		logAndOutput("New Application: "+ application['name']+ " ID: "+ str(application['id']),INFO)
+	
 	if application:
-				logAndOutput("New Application: "+ application['name']+ " ID: "+ str(application['id']),INFO)
 				createApplicationRules(applicationRules, application)
 	else:
 		logAndOutput("Failure creating a new Application",ERROR)
 		logAndOutput(application,ERROR)
+
+# Check if exist any application with applicationName in the Dynatrace environment
+#
+def isApplicationAlreadyDefinedInEnvironment(applicationName):
+	global APPLICATIONS_DEFINED_LIST
+	if APPLICATIONS_DEFINED_LIST is None :
+		logAndOutput("Retrieve all Applications defined in " + ENV,INFO)
+		APPLICATIONS_DEFINED_LIST = getApplicationsList()['values']
+	return applicationAlreadyDefinedInEnvironment(applicationName) is not None
 
 
 # Create body payload and post new Application 
@@ -80,7 +103,7 @@ def createApplication(applicationName):
 			# It does not verify if app exists, so if an application exist with the same name, it will create a new one with the appending (1) at the end of the AppName // "My App (1)"
 			return postNewApplication(newApplicationJson)
 	else :
-			return None 
+		return None 
 
 # Create body payload and post new Application Rule 
 #
@@ -189,6 +212,35 @@ def postNewEntity(endpointURL,dataJson):
 	except ssl.SSLError:
 		print("SSL Error")
 
+# Get List of applications already configured in the environment
+#
+def getApplicationsList():
+		return getEntity('/api/config/v1/applications/web')
+
+# getEntity: Query Dynatrace Environment for enities passed in the endpointURL
+#
+def getEntity(endpointURL):
+	try:
+		r = requests.get(ENV + endpointURL, headers=HEADERS_POST)
+		logAndOutput("Response Code: " + str(r.status_code), INFO)
+		# If 201, successful. The entity has been created
+		if r.status_code == 200:
+				return r.json()
+		# 400, failure on the creation of the entity
+		elif r.status_code == 400:
+			logAndOutput("Failure creating :",ERROR)
+			logAndOutput(dataJson,ERROR)
+			logAndOutput(r.json(),ERROR)
+		# 429, Too many request, we have slow donw how many calls per second we are sending (wait 5s and resend)
+		elif r.status_code == 429:
+			logAndOutput("Error too many calls, sleep 5s",INFO)
+		 	# Wait for 5 seconds
+			time.sleep(5)
+			return getEntity(endpointURL)
+		return r
+	except ssl.SSLError:
+		print("SSL Error")
+
 # formatEnvironmentURL: Verify if the Dynatrace environment URL has the proper format, starting with https:// and not ending with /
 #
 def formatEnvironmentURL(environmentURL):
@@ -199,6 +251,8 @@ def formatEnvironmentURL(environmentURL):
 	else:
 		return True
 
+# stores in log with teh severity indicated and prints on the terminal the message provided
+#
 def logAndOutput(msg, severity):
 	if severity == ERROR:
 		logger.error(msg)
@@ -220,8 +274,6 @@ def getValuesFromCommandLineArgs(argv):
    except getopt.GetoptError:
       print ('appCreator.py -e <environment> -t <token>')
       sys.exit(2)
-   print(opts)
-   print(args)
    for opt, arg in opts:
       if opt == '-e':
          ENV = arg
