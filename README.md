@@ -75,7 +75,7 @@ Execute the following command to run the script
 py appCreator.py
 ```
 
-You can include your Dynatrace Cluster URL and API Token passing command arguments -e <YOUR-DYNATRACE-CLUSTER-URL> -t <TOKEN> 
+You can include your Dynatrace Cluster URL and API Token passing command arguments `-e <YOUR-DYNATRACE-CLUSTER-URL> -t <TOKEN>` 
 
 
 ```
