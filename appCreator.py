@@ -1,5 +1,5 @@
 import pandas as pd
-import requests, ssl, os, sys, json, copy, logging, time
+import requests, ssl, os, sys, json, copy, logging, time, getopt
 from datetime import datetime
 
 
@@ -20,11 +20,14 @@ from datetime import datetime
 
 ENV =  '<Dynatrace_URL>'  # For example: 'https://mypilotenvironment.live.dynatrace.com' 
 TOKEN = '<API-Token>' # For example: 'asdASd8123asd'
-HEADERS = {'Authorization': 'Api-Token ' + TOKEN}
 HEADERS_POST = {'Authorization': 'Api-Token ' + TOKEN, 'Content-Type' : 'application/json'}
 APPLICATION_TEMPLATE = 'applicationTemplate.json'
 APPLICATION_RULE_TEMPLATE = 'applicationRuleTemplateCONTAINS.json'
 APPLICATION_RULES_EXCEL = "apps-test.xlsx"
+ERROR = "ERROR"
+INFO = "INFO"
+FORMAT_ERROR_MSG = "ERROR: Wrong Environment URL format, plase change teh ENV variable to follow the format : start with https://<your-Dynatrace-environment> , wihtout / at the end"
+FORMAT_ERROR_EXAMPLE_MSG = "Example: 'https://mypilotenvironment.live.dynatrace.com' or https://myenvironment.live.dynatrace.com or https://myenvironment.dynatrace-managed.com/e/123-123123-123-123-123"
 PATH = os.getcwd()
 logging.basicConfig(filename=datetime.now().strftime('appCreatorLog_%H_%M_%d_%m_%Y.log'), filemode='w', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
@@ -43,7 +46,6 @@ def readAppRules():
 	lastStoredApp = "";
 
 	for index, row in df.iterrows():
-	     logger.debug(row['AppName'], row['Rule'])
 	     app = row['AppName']
 	     if app in appRules :
 	     	# App Already exist, just append the new rule
@@ -59,13 +61,11 @@ def readAppRules():
 def createNewApplicationAndRules(applicationName, applicationRules):
 	application = createApplication(applicationName)
 	if application:
-				logger.debug(application)
-				print("New Application: "+ application['name']+ " ID: "+ str(application['id']))
-				logger.info("New Application: "+ application['name']+ " ID: "+ str(application['id']))
+				logAndOutput("New Application: "+ application['name']+ " ID: "+ str(application['id']),INFO)
 				createApplicationRules(applicationRules, application)
 	else:
-		logger.error("Failure creating a new Application")
-		logger.error(application)
+		logAndOutput("Failure creating a new Application",ERROR)
+		logAndOutput(application,ERROR)
 
 
 # Create body payload and post new Application 
@@ -73,6 +73,7 @@ def createNewApplicationAndRules(applicationName, applicationRules):
 def createApplication(applicationName):
 	# Create a new applicaiton based on applicaitonJson
 	newApplicationJson = createNewApplicationBody(applicationName)
+	logAndOutput("Validate new Application format: "+ applicationName,INFO)
 	# Validate if the Json to send.
 	if validateNewApplication(newApplicationJson):
 			# Post/Create a new application. 
@@ -88,22 +89,22 @@ def createApplicationRules(applicationRules, application):
 	for rule in applicationRules:
 		# Build the Json that contains the new Application Rule
 		newApplicationRuleJson = createNewApplicationRuleBody(rule, application['id'])
+		logAndOutput("Validate new Application Rule format: "+ rule,INFO)
 		# Validate the Json format of the new Application Rule
 		if validateNewApplicationRule(newApplicationRuleJson):
 				# Post/Create a new application
 				apprule = postNewApplicationRule(newApplicationRuleJson)
-				print("New Application Rule: "+ apprule['name']+ " ID: "+ apprule['id'])
-				logger.info("New Application Rule: "+ apprule['name']+ " ID: "+ apprule['id'])
+				logAndOutput("New Application Rule: "+ apprule['name']+ " ID: "+ apprule['id'],INFO)
 		else:
-			logger.error("Failure creating a new AppRule")
-			logger.error(newApplicationRuleJson)
+			logAndOutput("Failure creating a new AppRule",ERROR)
+
 
 #  Validate the format of the json, before creating an Application.
 #  Use the Dynatrace API endpoint /validate to confirm that this will be accepted
 #
 def validateNewApplication(newApplicationJson):
 	 response = postNewEntity('/api/config/v1/applications/web/validator',newApplicationJson)
-	 print(response.text)
+	 logAndOutput(response.text,INFO)
 	 return response.status_code == 204
 
 #  Validate the format of the json, before creating an Application Rule
@@ -169,21 +170,18 @@ def postNewEntity(endpointURL,dataJson):
 	j = json.JSONEncoder().encode(dataJson)
 	try:
 		r = requests.post(ENV + endpointURL, headers=HEADERS_POST, data=j)
-		print(r.status_code)
+		logAndOutput("Response Code: " + str(r.status_code), INFO)
 		# If 201, successful. The entity has been created
 		if r.status_code == 201:
 				return r.json()
 		# 400, failure on the creation of the entity
 		elif r.status_code == 400:
-			print("Failure creating :")
-			logger.error("Failure creating :")
-			logger.error(dataJson)
-			logger.error(r.json())
-			print(dataJson)
-			print(r.json())
+			logAndOutput("Failure creating :",ERROR)
+			logAndOutput(dataJson,ERROR)
+			logAndOutput(r.json(),ERROR)
 		# 429, Too many request, we have slow donw how many calls per second we are sending (wait 5s and resend)
 		elif r.status_code == 429:
-			print("Error too many calls, sleep 5s")
+			logAndOutput("Error too many calls, sleep 5s",INFO)
 			# Wait for 5 seconds
 			time.sleep(5)
 			return postNewEntity(endpointURL,dataJson)
@@ -195,22 +193,44 @@ def postNewEntity(endpointURL,dataJson):
 #
 def formatEnvironmentURL(environmentURL):
 	if environmentURL.endswith("/") or not environmentURL.startswith("https://"):
-		errorMsg = "ERROR: Wrong Environment URL format, plase change teh ENV variable to follow the format : start with https://<your-Dynatrace-environment> , wihtout / at the end"
-		errorExampleMSG = "Example: 'https://mypilotenvironment.live.dynatrace.com' or https://myenvironment.live.dynatrace.com or https://myenvironment.dynatrace-managed.com/e/123-123123-123-123-123"
-		logger.error(errorMsg)
-		print(errorMsg)
-		logger.error(errorExampleMSG)
-		print(errorExampleMSG)
+		logAndOutput(FORMAT_ERROR_MSG,ERROR)
+		logAndOutput(FORMAT_ERROR_EXAMPLE_MSG,ERROR)
 		return False
 	else:
 		return True
+
+def logAndOutput(msg, severity):
+	if severity == ERROR:
+		logger.error(msg)
+	else: 
+		logger.info(msg)
+	print(msg)
 
 # preConditionsEvaluation: Verify preconditions like formatEnvironmentURL
 #
 def preConditionsEvaluation():
 	return formatEnvironmentURL(ENV)
 
-def main():
+# getValuesFromCommandLineArgs: allows to pass the environment and token as command line arguments "-e <My-Envitonment> -t <my-token>"
+#
+def getValuesFromCommandLineArgs(argv):
+   global ENV, TOKEN, HEADERS_POST
+   try:
+      opts, args = getopt.getopt(argv,"e:t:",["environment=","token="])
+   except getopt.GetoptError:
+      print ('appCreator.py -e <environment> -t <token>')
+      sys.exit(2)
+   print(opts)
+   print(args)
+   for opt, arg in opts:
+      if opt == '-e':
+         ENV = arg
+      elif opt == "-t":
+         TOKEN = arg
+         HEADERS_POST = {'Authorization': 'Api-Token ' + TOKEN, 'Content-Type' : 'application/json'}
+
+def main(argv):
+	getValuesFromCommandLineArgs(argv)
 	if preConditionsEvaluation():
 		applicationList = readAppRules()
 		print("Edit the tenant: "+ ENV)
@@ -218,4 +238,4 @@ def main():
 			createNewApplicationAndRules(applicationName, applicationList[applicationName])
 
 if __name__ == '__main__':
-	main()
+	main(sys.argv[1:])
