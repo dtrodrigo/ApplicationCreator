@@ -6,29 +6,28 @@ from datetime import datetime
 
 #
 # BEFORE EXECUTING THE SCRIPT VERIFY:
-# - The ENV variable , where are you sending the information
+# - The ENV variable , where are you sending the information (this could be passed with -e command line)
 # - APPLICATION_RULES_EXCEL : app-test.xlsx where you are extracting the information
 # 	The format of the excel file has to be:
-# 	- First row: AppName	| Rule. 
-# 	- Second row contain the first rule to execute : MyNewApplicaiton | mydomain.com/mywebapp
-# 	- All the rules for an application should be grouped together in the excel file. If the file contains the applicaiton name+ rule not grouped, it will create multiple applicaitons with the same name 
+# 	- First row: AppName | pattern | applicationMatchTarget | applicationMatchType. 
+# 	- Second row contain the first rule to execute : MyNewApplicaiton | mydomain.com/mywebapp | URL | EQUALS
 #
-# - APPLICATION_TEMPLATE : select the template to define the application with or without RUM
-# - APPLICATION_RULE_TEMPLATE to apply: Begings With or Contains
-#   If using Begings with, add the string "https://" to the rule
+# - APPLICATION_TEMPLATE_PATH : select the template to define the application with or without RUM
 #
 
 ENV =  '<Dynatrace_URL>'  # For example: 'https://mypilotenvironment.live.dynatrace.com' 
 TOKEN = '<API-Token>' # For example: 'asdASd8123asd'
 HEADERS_POST = {'Authorization': 'Api-Token ' + TOKEN, 'Content-Type' : 'application/json'}
-APPLICATION_TEMPLATE = 'applicationTemplate.json'
-APPLICATION_RULE_TEMPLATE = 'applicationRuleTemplateCONTAINS.json'
+APPLICATION_TEMPLATE_PATH = 'applicationTemplate.json'
+APPLICATION_RULE_TEMPLATE_PATH = 'applicationRuleTemplate.json'
 APPLICATION_RULES_EXCEL = "apps-test.xlsx"
 ERROR = "ERROR"
 INFO = "INFO"
 FORMAT_ERROR_MSG = "ERROR: Wrong Environment URL format, plase change teh ENV variable to follow the format : start with https://<your-Dynatrace-environment> , wihtout / at the end"
 FORMAT_ERROR_EXAMPLE_MSG = "Example: 'https://mypilotenvironment.live.dynatrace.com' or https://myenvironment.live.dynatrace.com or https://myenvironment.dynatrace-managed.com/e/123-123123-123-123-123"
 APPLICATIONS_DEFINED_LIST = None
+APPLICATION_RULE_TEMPLATE = None
+APPLICATION_TEMPLATE = None
 PATH = os.getcwd()
 logging.basicConfig(filename=datetime.now().strftime('appCreatorLog_%H_%M_%d_%m_%Y.log'), filemode='w', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
@@ -36,10 +35,11 @@ logger.setLevel(logging.INFO)
 
 # readAppRules: Access to the excelfile indicated (app-test.xlsx), and returns an array with all the pairs Appname|AppRule. Edit the file to add your new application rules or use another file.
 # The format of the excel file has to be:
-# - First row: AppName	| Rule. 
-# - Second row contain the first rule to execute : MyNewApplicaiton | mydomain.com/mywebapp
-# - All the rules for an application should be grouped together in the excel file. If the file contains the applicaiton name+ rule not grouped, it will create multiple applicaitons with the same name 
-# Return: apprules will have the following format: {'App1': {'rules': ['myrule']}, 'App2': {'rules': ['myrule2', 'myrule3']}}
+# 	- First row: AppName | pattern | applicationMatchTarget | applicationMatchType. 
+# 	- Second row contain the first rule to execute : MyNewApplicaiton | mydomain.com/mywebapp | URL | EQUALS
+# Return: apprules will have the following format: 
+#		{'App1': [{'pattern': 'myrule', 'applicationMatchTarget': 'URL', 'applicationMatchType': 'EQUALS'}, {'pattern': 'myrule2', 'applicationMatchTarget': 'URL', 'applicationMatchType': 'EQUALS'}], 
+#        'App2': [{'pattern': 'myrule', 'applicationMatchTarget': 'URL', 'applicationMatchType': 'ENDS_WITH'}]}
 def readAppRules():
 	df = pd.read_excel(APPLICATION_RULES_EXCEL)
 
@@ -50,13 +50,18 @@ def readAppRules():
 	     app = row['AppName']
 	     if app in appRules :
 	     	# App Already exist, just append the new rule
-	     	appRules[app].append(row['Rule'])
+	     	appRules[app].append(createRuleDictionaryObj(row))
 	     else :
 	     	# New Application and new rule
-	     	appRules[app] = [row['Rule']]
+	     	appRules[app] = [createRuleDictionaryObj(row)]
 	return appRules
 
-# Return the application Name and ID if it is already defined on the environment
+# createRuleDictionaryObj: Receives excel Row, creates a Dictionary object with the ruleURL and conditions, following the format: {'pattern': 'myrule', 'applicationMatchTarget': 'URL', 'applicationMatchType': 'EQUALS'}
+#
+def createRuleDictionaryObj(row):
+	return {"pattern":row['pattern'], "applicationMatchTarget": row['applicationMatchTarget'], "applicationMatchType": row['applicationMatchType']}
+
+# applicationAlreadyDefinedInEnvironment: If there is already defined on the environment an application with the same name as 'applicationName, returns the application object with appName and ID
 # 
 def applicationAlreadyDefinedInEnvironment(applicationName):
 	for application in APPLICATIONS_DEFINED_LIST:
@@ -64,34 +69,38 @@ def applicationAlreadyDefinedInEnvironment(applicationName):
 			return application
 	return None
 
-# PostNewApplication: Create a new appication with the corresponding Application rules
+# createNewApplicationAndRules: Check if the application already exist in the enviroment and create or updates the application and the corresponding application rules
 #
 def createNewApplicationAndRules(applicationName, applicationRules):
 	# Just create a new application if this does not already exist on the Dynatrace Environment 
 	if isApplicationAlreadyDefinedInEnvironment(applicationName):
+		# if already exist, retrieve information from the applicationName and ID
 		application = applicationAlreadyDefinedInEnvironment(applicationName)
 		logAndOutput("Update Application: "+ application['name']+ " ID: "+ str(application['id']),INFO)
 	else:
+		# If it is a non existing application, it will be created
 		application = createApplication(applicationName)
 		logAndOutput("New Application: "+ application['name']+ " ID: "+ str(application['id']),INFO)
 	
 	if application:
-				createApplicationRules(applicationRules, application)
+		# If there were no issues retrieving or creating the application, then create the new application rules 
+		createApplicationRules(applicationRules, application)
 	else:
 		logAndOutput("Failure creating a new Application",ERROR)
 		logAndOutput(application,ERROR)
 
-# Check if exist any application with applicationName in the Dynatrace environment
+# isApplicationAlreadyDefinedInEnvironment: Check if exist any application with applicationName in the Dynatrace environment
 #
 def isApplicationAlreadyDefinedInEnvironment(applicationName):
 	global APPLICATIONS_DEFINED_LIST
+
 	if APPLICATIONS_DEFINED_LIST is None :
 		logAndOutput("Retrieve all Applications defined in " + ENV,INFO)
 		APPLICATIONS_DEFINED_LIST = getApplicationsList()['values']
 	return applicationAlreadyDefinedInEnvironment(applicationName) is not None
 
 
-# Create body payload and post new Application 
+# createApplication: Create body payload and post new Application 
 #
 def createApplication(applicationName):
 	# Create a new applicaiton based on applicaitonJson
@@ -100,19 +109,18 @@ def createApplication(applicationName):
 	# Validate if the Json to send.
 	if validateNewApplication(newApplicationJson):
 			# Post/Create a new application. 
-			# It does not verify if app exists, so if an application exist with the same name, it will create a new one with the appending (1) at the end of the AppName // "My App (1)"
 			return postNewApplication(newApplicationJson)
 	else :
 		return None 
 
-# Create body payload and post new Application Rule 
+# createApplicationRules: Create body payload and post new Application Rule 
 #
 def createApplicationRules(applicationRules, application):
 	# For each Application Rule obtained from the excel file
 	for rule in applicationRules:
 		# Build the Json that contains the new Application Rule
 		newApplicationRuleJson = createNewApplicationRuleBody(rule, application['id'])
-		logAndOutput("Validate new Application Rule format: "+ rule,INFO)
+		logAndOutput("Validate new Application Rule format: "+ rule['pattern'],INFO)
 		# Validate the Json format of the new Application Rule
 		if validateNewApplicationRule(newApplicationRuleJson):
 				# Post/Create a new application
@@ -122,7 +130,7 @@ def createApplicationRules(applicationRules, application):
 			logAndOutput("Failure creating a new AppRule",ERROR)
 
 
-#  Validate the format of the json, before creating an Application.
+#  validateNewApplication: Validate the format of the json, before creating an Application.
 #  Use the Dynatrace API endpoint /validate to confirm that this will be accepted
 #
 def validateNewApplication(newApplicationJson):
@@ -130,14 +138,14 @@ def validateNewApplication(newApplicationJson):
 	 logAndOutput(response.text,INFO)
 	 return response.status_code == 204
 
-#  Validate the format of the json, before creating an Application Rule
+#  validateNewApplicationRule: Validate the format of the json, before creating an Application Rule
 #  Use the Dynatrace API endpoint /validate to confirm that this will be accepted
 #
 def validateNewApplicationRule(newApplicationRuleJson):
 	 response = postNewEntity('/api/config/v1/applicationDetectionRules/validator',newApplicationRuleJson)
 	 return response.status_code == 204
 
-# Build Body payload of an Applicaiton to send on API call.
+# createNewApplicationBody: Build Body payload of an Applicaiton to send on API call.
 # Based on the applicationTemplate.json, it changes that template to use the AppName extracted from the excel file 
 #
 def createNewApplicationBody(applicationName):
@@ -145,49 +153,63 @@ def createNewApplicationBody(applicationName):
 	newApplicationBodyJson['name'] = applicationName
 	return newApplicationBodyJson
 
-# Build Body payload of a new Applicaiton Rule to send on API call.
-# Based on the applicationRuleTemplateCONTAINS.json, it changes that template to use the right ApplicationIdentifier and the URL pattern extracted from the excel file 
+# createNewApplicationRuleBody: Build Body payload of a new Applicaiton Rule to send on API call.
+# Based on the applicationRuleTemplate.json, it changes that template to use the right ApplicationIdentifier, URL pattern, applicationMatchType and applicationMatchTarget extracted from the excel file 
 #
 def createNewApplicationRuleBody(rule, applicationID):
 	newApplicationRuleBodyJson = readApplicationRuleTemplate()
 	newApplicationRuleBodyJson['applicationIdentifier'] = applicationID
-	newApplicationRuleBodyJson['filterConfig']['pattern'] = rule 
+	newApplicationRuleBodyJson['filterConfig']['pattern'] = rule['pattern']
+	newApplicationRuleBodyJson['filterConfig']['applicationMatchType'] = rule['applicationMatchType']
+	newApplicationRuleBodyJson['filterConfig']['applicationMatchTarget'] = rule['applicationMatchTarget']
 	# Add framework config  or other options
 	return newApplicationRuleBodyJson
 
-# Read Json file, to be used as template when creating new application Json payload body
+# readApplicationTemplate: Verify if the APPLICATION_TEMPLATE has been already created, if not it will read Json file from APPLICATION_TEMPLATE_PATH,
+#							to be used as template when creating new application Json payload body
 # The current template has enabled RUM monitoring, if no RUM or other configuration want to be used, modify the applicationTemplate.json
 # for example: applicaitonTemplate-NO-RUM.json, can be used as template to create applications with RUM dissabled
 #
 def readApplicationTemplate():
-	return readTemplate(APPLICATION_TEMPLATE)
+	global APPLICATION_TEMPLATE
+	
+	if APPLICATION_TEMPLATE is None:
+		APPLICATION_TEMPLATE = readTemplate(APPLICATION_TEMPLATE_PATH)
+	return APPLICATION_TEMPLATE
 
-#
-# Read Json file, to be used as template when creating new application rule Json payload body
-# The current template has use "contains" rule, if another rule "starts with", "ends with"... wants to be used, you can modify the applicationRuleTemplateCONTAINS.json
-# for example: applicationRuleTemplate-BEGINS_WITH.json, can be used as template to create applications with RUM dissabled
+# readApplicationRuleTemplate: Verify if the APPLICATION_RULE_TEMPLATE has been already created, if not it will read Json file from APPLICATION_RULE_TEMPLATE_PATH, 
+# 								to be used as template when creating new application rule Json payload body
 #
 def readApplicationRuleTemplate():
-	return readTemplate(APPLICATION_RULE_TEMPLATE)
+	global APPLICATION_RULE_TEMPLATE
 
-# ReadTemplate: read information from the file template.json, in the same locations as the dahsboard.py script
-#				Rerunts the data in json format
+	if APPLICATION_RULE_TEMPLATE is None:
+		APPLICATION_RULE_TEMPLATE = readTemplate(APPLICATION_RULE_TEMPLATE_PATH)
+	return APPLICATION_RULE_TEMPLATE
+
+# ReadTemplate: read information from the file template.json, in the same locations as the script
+#				Returns the data in json format
 def readTemplate(template):
 	with open(template, encoding="utf8") as json_file:  
 		data = json.load(json_file)
 	return data
 
-# Post new Applicaiton entity
+# postNewApplication: Post new Application entity
 #
 def postNewApplication(newApplicationJson):
 		return postNewEntity('/api/config/v1/applications/web',newApplicationJson)
 
-# Post new Applicaiton rule entity
+# postNewApplicationRule: Post new Application rule entity
 #
 def postNewApplicationRule(newApplicationRuleJson):
 		return postNewEntity('/api/config/v1/applicationDetectionRules',newApplicationRuleJson)
 
-# Builds the URLs and  query needed to post/create a new entity
+# getApplicationsList: Get List of applications already configured in the environment
+#
+def getApplicationsList():
+		return getEntity('/api/config/v1/applications/web')
+
+# postNewEntity: Builds the URLs and  query needed to post/create a new entity
 #
 def postNewEntity(endpointURL,dataJson):
 	j = json.JSONEncoder().encode(dataJson)
@@ -211,11 +233,6 @@ def postNewEntity(endpointURL,dataJson):
 		return r
 	except ssl.SSLError:
 		print("SSL Error")
-
-# Get List of applications already configured in the environment
-#
-def getApplicationsList():
-		return getEntity('/api/config/v1/applications/web')
 
 # getEntity: Query Dynatrace Environment for enities passed in the endpointURL
 #
@@ -251,7 +268,7 @@ def formatEnvironmentURL(environmentURL):
 	else:
 		return True
 
-# stores in log with teh severity indicated and prints on the terminal the message provided
+# logAndOutput: stores in log with the severity indicated and prints on the terminal the message provided
 #
 def logAndOutput(msg, severity):
 	if severity == ERROR:
@@ -287,7 +304,7 @@ def main(argv):
 		applicationList = readAppRules()
 		print("Edit the tenant: "+ ENV)
 		for applicationName in applicationList:
-			createNewApplicationAndRules(applicationName, applicationList[applicationName])
+			createNewApplicationAndRules(applicationName, applicationList[applicationName]) #applicationList[applicationName] actualmente [r1,r2], tenemos que hacer [{patter:r1,x:URL,y:begins}]
 
 if __name__ == '__main__':
 	main(sys.argv[1:])

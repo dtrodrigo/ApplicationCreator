@@ -1,8 +1,0 @@
-{
-  "applicationIdentifier": "APPLICATION-XXXX",
-  "filterConfig": {
-    "pattern": "https://domain.com/context",
-    "applicationMatchType": "BEGINS_WITH",
-    "applicationMatchTarget": "URL"
-  }
-}

@@ -18,17 +18,18 @@ These instructions will get you a copy of the project up and running on your loc
 
 * Dynatrace API Token
 
-* Application definition rules - provided in this repo [app-test.xlsx](app-test.xlsx) (the excel file will contain the AppName followe for the URL rule definition to apply) 
+* Application definition rules - provided in this repo [app-test.xlsx](app-test.xlsx) . The excel file will contain the following columns:
+ - *AppName* : name of the application
+ - *pattern* : URL pattern to look for
+ - *applicationMatchTarget* : Defines the matching rule. Can hold the values : URL / DOMAIN 
+ - *applicationMatchType* : Defines where to look for the string. Can hold the values : BEGINS_WITH / CONTAINS / ENDS_WITH / EQUALS / MATCHES 
 
+
+![Excel file with application rules to define](img/excel.PNG?raw=true "Excel file with application rules to define")
 
 * Application definition template - Select the proper template to create an application with or without RUM enabled. Templates provided in this repo:
 [applicationTemplate.json](applicationTemplate.json)
 [applicationTemplate-NO-RUM.json](applicationTemplate-NO-RUM.json)
-
-
-* Application Rule templates - Select the rules to apply to the application rules together with the URLs from teh excel file. Is needed to indicate is those rules will be URL contains, begins with... There are different json tempaltes for the different rules that can be applied
-[applicationRuleTemplate-BEGINS_WITH.json](applicationRuleTemplate-BEGINS_WITH.json)
-[applicationRuleTemplateCONTAINS.json](applicationRuleTemplateCONTAINS.json)
 
 
 ![Application Rules Options in the Dynatrace Web UI](img/ruleOptions.PNG?raw=true "Application Rules Options in the Dynatrace Web UI")
@@ -54,11 +55,6 @@ Write configuration is needed to create new application and application rule def
 Edit the appCreator.py file, select the right templates to have RUM enabled or not
 ```
 APPLICATION_TEMPLATE = 'applicationTemplate.json'
-```
-
-And to create the rules with the right condition
-```
-APPLICATION_RULE_TEMPLATE = 'applicationRuleTemplateCONTAINS.json'
 ```
 
 You can include your Dynatrace cluster URL and API Token modifying ENV and TOKEN variables or passing command arguments -e <YOUR-DYNATRACE-CLUSTER-URL> -t <YOUR-DYNATRACE-API-TOKEN> see [Running the tests](#Running-the-tests)
