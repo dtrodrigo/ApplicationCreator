@@ -43,7 +43,8 @@ The token will need the following rights:
 Read configuration
 Write configuration
 ```
-Read configuration is needed to retrieve all the current applications defined in your environment
+Read configuration is needed to retrieve all the current applications defined in your environment.
+
 Write configuration is needed to create new application and application rule definitions
 
 ![Generate token](img/Token.png?raw=true "Generate token")
