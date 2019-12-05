@@ -40,19 +40,17 @@ To create a new token, access to Dynatrace UI Settings > Integration > Dynatrace
 The token will need the following rights:
 
 ```
+Read configuration
 Write configuration
 ```
+Read configuration is needed to retrieve all the current applications defined in your environment
+Write configuration is needed to create new application and application rule definitions
+
 ![Generate token](img/Token.png?raw=true "Generate token")
 
 ## Edit script
 
-Edit the appCreator.py file, include your Dynatrace cluster URL and API Token
-
-```
-ENV = 'https://YOUR-DYNATRACE-CLUSTER-URL'
-TOKEN = 'YOUR-DYNATRACE-API-TOKEN'
-```
-Select the right templates to have RUM enabled or not
+Edit the appCreator.py file, select the right templates to have RUM enabled or not
 ```
 APPLICATION_TEMPLATE = 'applicationTemplate.json'
 ```
@@ -60,6 +58,13 @@ APPLICATION_TEMPLATE = 'applicationTemplate.json'
 And to create the rules with the right condition
 ```
 APPLICATION_RULE_TEMPLATE = 'applicationRuleTemplateCONTAINS.json'
+```
+
+You can include your Dynatrace cluster URL and API Token modifying ENV and TOKEN variables or passing command arguments -e <YOUR-DYNATRACE-CLUSTER-URL> -t <YOUR-DYNATRACE-API-TOKEN> see [Running the tests](#Running-the-tests)
+
+```
+ENV = 'https://YOUR-DYNATRACE-CLUSTER-URL'
+TOKEN = 'YOUR-DYNATRACE-API-TOKEN'
 ```
 
 ## Running the tests
@@ -70,14 +75,25 @@ Execute the following command to run the script
 py appCreator.py
 ```
 
+You can include your Dynatrace Cluster URL and API Token passing command arguments -e <YOUR-DYNATRACE-CLUSTER-URL> -t <TOKEN> 
+
+
+```
+py appCreator.py -e <YOUR-DYNATRACE-CLUSTER-URL> -t <YOUR-DYNATRACE-API-TOKEN> 
+```
+
 The output will print the HTTP code of the validation(204) and creation (201), after creation the id of the new entity will be printed
 ```
 Edit the tenant: https://YOUR-DYNATRACE-CLUSTER-URL
-204
-201
+Retrieve all Applications defined in https://YOUR-DYNATRACE-CLUSTER-URL
+Response Code: 200
+Validate new Application format: My Application Name
+Response Code: 204
+Response Code: 201
 New Application: My Application Name ID: APPLICATION-CCEA52B08BF3D123
-204
-201
+Validate new Application Rule format: myapplication.com/mysite
+Response Code: 204
+Response Code: 201
 New Application Rule: My Application Name ID: c0601982-eb34-4eef-9e47-54076397123
 ```
 
@@ -99,4 +115,3 @@ appCreatorLog_12_46_10_10_2019.log
 ## Limitations
 
 The maximum Application rules allowed in v176 is 1000 different Application definitions.
-If the application is already defined with teh same name as provided in the excel, it will create another one with the saame name followed by (1), ie: "My repeated App (1)"
